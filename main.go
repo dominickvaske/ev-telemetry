@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
-// Initial package scope variables
+// ErrVehicleNotFound : a descriptive error to pass when a vehicle not found
+// in fleet store
 var ErrVehicleNotFound = errors.New("vehicle not found")
 
+// FleetStore : Fleet store struct followed by corresponding constructor
 type FleetStore struct {
 	vehicles map[string]Vehicle
 }
@@ -19,7 +21,7 @@ func newFleetStore() *FleetStore {
 	}
 }
 
-// Add a vehicle to the fleetstore
+// Add a vehicle to the Fleet Store
 func (fs *FleetStore) Add(v Vehicle) {
 	fs.vehicles[v.ID] = v
 }
@@ -72,6 +74,15 @@ func (fs *FleetStore) UpdateTemp(id string, temp float64) error {
 	return ErrVehicleNotFound
 }
 
+func (fs *FleetStore) Remove(id string) (Vehicle, error) {
+	val, ok := fs.vehicles[id]
+	if ok {
+		delete(fs.vehicles, id)
+		return val, nil
+	}
+	return Vehicle{}, ErrVehicleNotFound
+}
+
 type Vehicle struct {
 	ID         string
 	BatteryPct float64
@@ -98,6 +109,20 @@ func main() {
 
 	err := store.UpdateBattery("Bad-ID", 20)
 	if err != nil {
-		fmt.Println("error: ", err)
+		fmt.Println("Update Battery error: ", err)
 	}
+
+	_, err = store.Remove("Bad-ID")
+	if err != nil {
+		fmt.Println("Remove error: ", err)
+	}
+
+	v, err := store.Remove("V-002")
+	if err != nil {
+		fmt.Println("Remove error: ", err)
+	} else {
+		fmt.Printf("Removed Vehicle: %s: ", v.ID)
+		fmt.Println(v)
+	}
+
 }
