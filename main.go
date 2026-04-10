@@ -34,7 +34,7 @@ func (fs *FleetStore) Get(id string) (Vehicle, bool) {
 
 // List all vehicles currently in fleet store by returning slice
 func (fs *FleetStore) List() []Vehicle {
-	var result []Vehicle
+	result := make([]Vehicle, 0)
 	for _, vehicle := range fs.vehicles {
 		result = append(result, vehicle)
 	}
@@ -83,6 +83,49 @@ func (fs *FleetStore) Remove(id string) (Vehicle, error) {
 	return Vehicle{}, ErrVehicleNotFound
 }
 
+func (fs *FleetStore) ListCharging() []Vehicle {
+	result := make([]Vehicle, 0)
+	for _, vehicle := range fs.vehicles {
+		if vehicle.IsCharging {
+			result = append(result, vehicle)
+		}
+	}
+	return result
+}
+
+func (fs *FleetStore) Summary() FleetSummary {
+	fleetSum := FleetSummary{}
+	chargingCount := 0
+	totalVehicles := 0
+	var avgBatteryPct float64 = 0
+	var avgSpeedKPH float64 = 0
+
+	for _, v := range fs.vehicles {
+		totalVehicles++
+
+		if v.IsCharging {
+			chargingCount++
+		}
+
+		avgBatteryPct += v.BatteryPct
+		avgSpeedKPH += v.SpeedKPH
+
+	}
+	fleetSum.TotalVehicles = totalVehicles
+	fleetSum.ChargingCount = chargingCount
+	fleetSum.AvgBatteryPct = avgBatteryPct / float64(totalVehicles)
+	fleetSum.AvgSpeedKPH = avgSpeedKPH / float64(totalVehicles)
+
+	return fleetSum
+}
+
+type FleetSummary struct {
+	TotalVehicles int
+	ChargingCount int
+	AvgBatteryPct float64
+	AvgSpeedKPH   float64
+}
+
 type Vehicle struct {
 	ID         string
 	BatteryPct float64
@@ -107,16 +150,19 @@ func main() {
 		fmt.Println(vehicle)
 	}
 
+	// test update battery
 	err := store.UpdateBattery("Bad-ID", 20)
 	if err != nil {
 		fmt.Println("Update Battery error: ", err)
 	}
 
+	// test remove function
 	_, err = store.Remove("Bad-ID")
 	if err != nil {
 		fmt.Println("Remove error: ", err)
 	}
 
+	// test remove function
 	v, err := store.Remove("V-002")
 	if err != nil {
 		fmt.Println("Remove error: ", err)
@@ -125,4 +171,16 @@ func main() {
 		fmt.Println(v)
 	}
 
+	// test list charging function
+	charging := store.ListCharging()
+	fmt.Println("Vehicles charging: ")
+	for _, v := range charging {
+		fmt.Println(v)
+	}
+
+	summary := store.Summary()
+	fmt.Println("Number of Vehicles: ", summary.TotalVehicles)
+	fmt.Println("Number Charging: ", summary.ChargingCount)
+	fmt.Printf("Average Battery Percent: %f\n", summary.AvgBatteryPct)
+	fmt.Printf("Average Speed: %f\n", summary.AvgSpeedKPH)
 }
