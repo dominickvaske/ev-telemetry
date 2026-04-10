@@ -39,10 +39,34 @@ func (fs *FleetStore) List() []Vehicle {
 	return result
 }
 
+// UpdateBattery of a passed in id for a vehicle
 func (fs *FleetStore) UpdateBattery(id string, pct float64) error {
 	val, ok := fs.vehicles[id]
 	if ok {
 		val.BatteryPct = pct
+		fs.vehicles[id] = val
+		return nil
+	}
+	return ErrVehicleNotFound
+}
+
+// UpdateSpeed of provided vehicle
+func (fs *FleetStore) UpdateSpeed(id string, speed float64) error {
+	val, ok := fs.vehicles[id]
+	if ok {
+		val.SpeedKPH = speed
+		fs.vehicles[id] = val
+		return nil
+	}
+	return ErrVehicleNotFound
+}
+
+// UpdateTemp of a vehicle
+func (fs *FleetStore) UpdateTemp(id string, temp float64) error {
+	val, ok := fs.vehicles[id]
+	if ok {
+		val.TempC = temp
+		fs.vehicles[id] = val
 		return nil
 	}
 	return ErrVehicleNotFound
