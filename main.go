@@ -1,9 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
+
+// Initial package scope variables
+var ErrVehicleNotFound = errors.New("vehicle not found")
 
 type FleetStore struct {
 	vehicles map[string]Vehicle
@@ -26,13 +30,22 @@ func (fs *FleetStore) Get(id string) (Vehicle, bool) {
 	return val, ok
 }
 
-// List all vehicles currently in fleetstore
+// List all vehicles currently in fleet store by returning slice
 func (fs *FleetStore) List() []Vehicle {
 	var result []Vehicle
 	for _, vehicle := range fs.vehicles {
 		result = append(result, vehicle)
 	}
 	return result
+}
+
+func (fs *FleetStore) UpdateBattery(id string, pct float64) error {
+	val, ok := fs.vehicles[id]
+	if ok {
+		val.BatteryPct = pct
+		return nil
+	}
+	return ErrVehicleNotFound
 }
 
 type Vehicle struct {
@@ -57,5 +70,10 @@ func main() {
 
 	for _, vehicle := range store.List() {
 		fmt.Println(vehicle)
+	}
+
+	err := store.UpdateBattery("Bad-ID", 20)
+	if err != nil {
+		fmt.Println("error: ", err)
 	}
 }
