@@ -94,29 +94,27 @@ func (fs *FleetStore) ListCharging() []Vehicle {
 }
 
 func (fs *FleetStore) Summary() FleetSummary {
-	fleetSum := FleetSummary{}
-	chargingCount := 0
-	totalVehicles := 0
-	var avgBatteryPct float64 = 0
-	var avgSpeedKPH float64 = 0
+	var chargingCount, totalVehicles int
+	var avgBatteryPct, avgSpeedKPH float64
 
 	for _, v := range fs.vehicles {
 		totalVehicles++
-
 		if v.IsCharging {
 			chargingCount++
 		}
-
 		avgBatteryPct += v.BatteryPct
 		avgSpeedKPH += v.SpeedKPH
 
 	}
-	fleetSum.TotalVehicles = totalVehicles
-	fleetSum.ChargingCount = chargingCount
-	fleetSum.AvgBatteryPct = avgBatteryPct / float64(totalVehicles)
-	fleetSum.AvgSpeedKPH = avgSpeedKPH / float64(totalVehicles)
-
-	return fleetSum
+	if totalVehicles == 0 {
+		return FleetSummary{}
+	}
+	return FleetSummary{
+		TotalVehicles: totalVehicles,
+		ChargingCount: chargingCount,
+		AvgBatteryPct: avgBatteryPct / float64(totalVehicles),
+		AvgSpeedKPH:   avgSpeedKPH / float64(totalVehicles),
+	}
 }
 
 type FleetSummary struct {
