@@ -1,19 +1,20 @@
-package main
+package store
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
 )
 
-// FleetStore : Fleet store struct followed by corresponding constructor
+// FleetStore defines struct to hold all vehicles in a fleet
 type FleetStore struct {
 	vehicles map[string]fleet.Vehicle
 }
 
-func newFleetStore() *FleetStore {
+// NewFleetStore defines the constructor for creating a
+// FleetStore struct
+func NewFleetStore() *FleetStore {
 	return &FleetStore{
 		vehicles: make(map[string]fleet.Vehicle),
 	}
@@ -82,7 +83,7 @@ func (fs *FleetStore) UpdateChgState(id string) error {
 	return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 }
 
-// UpdateVehicle updates a vehicle based on ID with package updates
+// UpdateVehicle updates a vehicle in the store based on ID with package updates
 func (fs *FleetStore) UpdateVehicle(id string, update fleet.VehicleUpdate) error {
 	// grab the proper vehicle to update
 	val, ok := fs.vehicles[id]
@@ -92,7 +93,7 @@ func (fs *FleetStore) UpdateVehicle(id string, update fleet.VehicleUpdate) error
 	}
 
 	// perform nil checks on fields of update Vehicle
-	var retErr error = nil
+	var retErr error
 	updated := false
 
 	if update.NewSpd != nil {
@@ -147,7 +148,7 @@ func (fs *FleetStore) Remove(id string) (fleet.Vehicle, error) {
 	return fleet.Vehicle{}, fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 }
 
-// ListCharging : Returns slice of all vehicle structs currently charging
+// ListCharging returns slice of all vehicle structs currently charging
 func (fs *FleetStore) ListCharging() []fleet.Vehicle {
 	result := make([]fleet.Vehicle, 0)
 	for _, vehicle := range fs.vehicles {
@@ -181,112 +182,4 @@ func (fs *FleetStore) Summary() fleet.Summary {
 		AvgBatteryPct: avgBatteryPct / float64(totalVehicles),
 		AvgSpeedKPH:   avgSpeedKPH / float64(totalVehicles),
 	}
-}
-
-// SimulateTick runs through all vehicles and drops battery
-// percentage by one point to simulate a drive time instance
-func (fs *FleetStore) SimulateTick() []Alert {
-	alerts := make([]Alert, 0)
-
-	for id, vehicle := range fs.vehicles {
-		vehicle.BatteryPct--
-
-		if vehicle.BatteryPct < 10.0 {
-			alert := Alert{
-				ID:         "A-" + strconv.Itoa(globalAlertID),
-				alertVEHID: id,
-				Type:       BatteryAlert,
-				Value:      vehicle.BatteryPct,
-				Message:    "Battery less than 10 percent",
-				TimeStamp:  time.Now(),
-			}
-			globalAlertID++
-			alerts = append(alerts, alert)
-		}
-		err := fs.UpdateBattery(id, vehicle.BatteryPct)
-		if err != nil { // vehicle not found
-			continue
-		}
-	}
-	return alerts
-}
-
-type AlertType string
-
-const (
-	TempAlert    AlertType = "TEMPERATURE"
-	SpeedAlert   AlertType = "SPEED"
-	BatteryAlert AlertType = "BATTERY"
-)
-
-// TODO: not thread-safe, replace with atomic or mutex in Phase 2
-var globalAlertID = 1
-
-type Alert struct {
-	ID         string    // Unique ID for alert event
-	alertVEHID string    // ID of the vehicle with the alert
-	Type       AlertType // AlertType (string) for reason for alert
-	Value      float64   // raw value causing alert
-	Message    string    // human-readable error message
-	TimeStamp  time.Time // timestamp of alert creation
-}
-
-func main() {
-	v1 := fleet.Vehicle{ID: "V-001", BatteryPct: 86.0, SpeedKPH: 0.0, TempC: 21.0, IsCharging: true, Timestamp: time.Now()}
-	v2 := fleet.Vehicle{ID: "V-002", BatteryPct: 70.0, SpeedKPH: 66.0, TempC: 24.0, IsCharging: false, Timestamp: time.Now()}
-	v3 := fleet.Vehicle{ID: "V-003", BatteryPct: 43.0, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
-
-	store := newFleetStore()
-
-	store.Add(v1)
-	store.Add(v2)
-	store.Add(v3)
-
-	for _, vehicle := range store.List() {
-		fmt.Println(vehicle)
-	}
-
-	// test update battery
-	//err := store.UpdateBattery("Bad-ID", 20)
-	//if err != nil {
-	//	fmt.Println("Update Battery error: ", err)
-	//}
-	//
-	//// test remove function
-	//_, err = store.Remove("Bad-ID")
-	//if err != nil {
-	//	fmt.Println("Remove error: ", err)
-	//}
-
-	// test remove function
-	//v, err := store.Remove("V-002")
-	//if err != nil {
-	//	fmt.Println("Remove error: ", err)
-	//} else {
-	//	fmt.Printf("Removed Vehicle: %s: ", v.ID)
-	//	fmt.Println(v)
-	//}
-
-	// test list charging function
-	//charging := store.ListCharging()
-	//fmt.Println("Vehicles charging: ")
-	//for _, v := range charging {
-	//	fmt.Println(v)
-	//}
-
-	//summary := store.Summary()
-	//fmt.Println("Number of Vehicles: ", summary.TotalVehicles)
-	//fmt.Println("Number Charging: ", summary.ChargingCount)
-	//fmt.Printf("Average Battery Percent: %f\n", summary.AvgBatteryPct)
-	//fmt.Printf("Average Speed: %f\n", summary.AvgSpeedKPH)
-
-	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
-
-	store.Add(v4)
-	alerts := store.SimulateTick()
-
-	for _, a := range alerts {
-		fmt.Println(a)
-	}
-
 }
