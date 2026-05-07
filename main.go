@@ -4,33 +4,35 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/dominickvaske/ev-telemetry/internal/fleet"
 )
 
 // FleetStore : Fleet store struct followed by corresponding constructor
 type FleetStore struct {
-	vehicles map[string]Vehicle
+	vehicles map[string]fleet.Vehicle
 }
 
 func newFleetStore() *FleetStore {
 	return &FleetStore{
-		vehicles: make(map[string]Vehicle),
+		vehicles: make(map[string]fleet.Vehicle),
 	}
 }
 
 // Add a vehicle to the Fleet Store
-func (fs *FleetStore) Add(v Vehicle) {
+func (fs *FleetStore) Add(v fleet.Vehicle) {
 	fs.vehicles[v.ID] = v
 }
 
 // Get a vehicle from a string
-func (fs *FleetStore) Get(id string) (Vehicle, bool) {
+func (fs *FleetStore) Get(id string) (fleet.Vehicle, bool) {
 	val, ok := fs.vehicles[id]
 	return val, ok
 }
 
 // List all vehicles currently in fleet store by returning slice
-func (fs *FleetStore) List() []Vehicle {
-	result := make([]Vehicle, 0)
+func (fs *FleetStore) List() []fleet.Vehicle {
+	result := make([]fleet.Vehicle, 0)
 	for _, vehicle := range fs.vehicles {
 		result = append(result, vehicle)
 	}
@@ -81,7 +83,7 @@ func (fs *FleetStore) UpdateChgState(id string) error {
 }
 
 // UpdateVehicle updates a vehicle based on ID with package updates
-func (fs *FleetStore) UpdateVehicle(id string, update VehicleUpdate) error {
+func (fs *FleetStore) UpdateVehicle(id string, update fleet.VehicleUpdate) error {
 	// grab the proper vehicle to update
 	val, ok := fs.vehicles[id]
 
@@ -93,31 +95,31 @@ func (fs *FleetStore) UpdateVehicle(id string, update VehicleUpdate) error {
 	var retErr error = nil
 	updated := false
 
-	if update.newSpd != nil {
-		retErr = fs.UpdateSpeed(id, *update.newSpd)
+	if update.NewSpd != nil {
+		retErr = fs.UpdateSpeed(id, *update.NewSpd)
 		if retErr != nil {
 			return retErr
 		}
 		updated = true
 	}
 
-	if update.newBatPct != nil {
-		retErr = fs.UpdateBattery(id, *update.newBatPct)
+	if update.NewBatPct != nil {
+		retErr = fs.UpdateBattery(id, *update.NewBatPct)
 		if retErr != nil {
 			return retErr
 		}
 		updated = true
 	}
 
-	if update.newTemp != nil {
-		retErr = fs.UpdateTemp(id, *update.newTemp)
+	if update.NewTemp != nil {
+		retErr = fs.UpdateTemp(id, *update.NewTemp)
 		if retErr != nil {
 			return retErr
 		}
 		updated = true
 	}
 
-	if update.newChgState != nil {
+	if update.NewChgState != nil {
 		retErr = fs.UpdateChgState(id)
 		if retErr != nil {
 			return retErr
@@ -136,18 +138,18 @@ func (fs *FleetStore) UpdateVehicle(id string, update VehicleUpdate) error {
 
 // Remove removes a vehicle from the fleet store
 // returns the removed vehicle or an error if vehicle not found
-func (fs *FleetStore) Remove(id string) (Vehicle, error) {
+func (fs *FleetStore) Remove(id string) (fleet.Vehicle, error) {
 	val, ok := fs.vehicles[id]
 	if ok {
 		delete(fs.vehicles, id)
 		return val, nil
 	}
-	return Vehicle{}, fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
+	return fleet.Vehicle{}, fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 }
 
 // ListCharging : Returns slice of all vehicle structs currently charging
-func (fs *FleetStore) ListCharging() []Vehicle {
-	result := make([]Vehicle, 0)
+func (fs *FleetStore) ListCharging() []fleet.Vehicle {
+	result := make([]fleet.Vehicle, 0)
 	for _, vehicle := range fs.vehicles {
 		if vehicle.IsCharging {
 			result = append(result, vehicle)
@@ -156,8 +158,8 @@ func (fs *FleetStore) ListCharging() []Vehicle {
 	return result
 }
 
-// Summary provides a FleetSummary struct of the fleet store
-func (fs *FleetStore) Summary() FleetSummary {
+// Summary provides a Summary struct of the fleet store
+func (fs *FleetStore) Summary() fleet.Summary {
 	var chargingCount, totalVehicles int
 	var avgBatteryPct, avgSpeedKPH float64
 
@@ -171,9 +173,9 @@ func (fs *FleetStore) Summary() FleetSummary {
 
 	}
 	if totalVehicles == 0 {
-		return FleetSummary{}
+		return fleet.Summary{}
 	}
-	return FleetSummary{
+	return fleet.Summary{
 		TotalVehicles: totalVehicles,
 		ChargingCount: chargingCount,
 		AvgBatteryPct: avgBatteryPct / float64(totalVehicles),
@@ -209,30 +211,6 @@ func (fs *FleetStore) SimulateTick() []Alert {
 	return alerts
 }
 
-type FleetSummary struct {
-	TotalVehicles int
-	ChargingCount int
-	AvgBatteryPct float64
-	AvgSpeedKPH   float64
-}
-
-type Vehicle struct {
-	ID         string
-	BatteryPct float64
-	SpeedKPH   float64
-	TempC      float64
-	IsCharging bool
-	Timestamp  time.Time
-}
-
-type VehicleUpdate struct {
-	newTemp     *float64
-	newSpd      *float64
-	newBatPct   *float64
-	newChgState *bool
-	updateTime  *time.Time
-}
-
 type AlertType string
 
 const (
@@ -254,9 +232,9 @@ type Alert struct {
 }
 
 func main() {
-	v1 := Vehicle{ID: "V-001", BatteryPct: 86.0, SpeedKPH: 0.0, TempC: 21.0, IsCharging: true, Timestamp: time.Now()}
-	v2 := Vehicle{ID: "V-002", BatteryPct: 70.0, SpeedKPH: 66.0, TempC: 24.0, IsCharging: false, Timestamp: time.Now()}
-	v3 := Vehicle{ID: "V-003", BatteryPct: 43.0, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
+	v1 := fleet.Vehicle{ID: "V-001", BatteryPct: 86.0, SpeedKPH: 0.0, TempC: 21.0, IsCharging: true, Timestamp: time.Now()}
+	v2 := fleet.Vehicle{ID: "V-002", BatteryPct: 70.0, SpeedKPH: 66.0, TempC: 24.0, IsCharging: false, Timestamp: time.Now()}
+	v3 := fleet.Vehicle{ID: "V-003", BatteryPct: 43.0, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
 
 	store := newFleetStore()
 
@@ -302,7 +280,7 @@ func main() {
 	//fmt.Printf("Average Battery Percent: %f\n", summary.AvgBatteryPct)
 	//fmt.Printf("Average Speed: %f\n", summary.AvgSpeedKPH)
 
-	v4 := Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
+	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
 
 	store.Add(v4)
 	alerts := store.SimulateTick()
