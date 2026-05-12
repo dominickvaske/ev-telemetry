@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
@@ -9,7 +10,8 @@ import (
 
 // FleetStore defines struct to hold all vehicles in a fleet
 type FleetStore struct {
-	vehicles map[string]fleet.Vehicle
+	vehicles   map[string]fleet.Vehicle
+	updateLock sync.RWMutex
 }
 
 // NewFleetStore defines the constructor for creating a
@@ -22,17 +24,23 @@ func NewFleetStore() *FleetStore {
 
 // Add a vehicle to the Fleet Store
 func (fs *FleetStore) Add(v fleet.Vehicle) {
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
 	fs.vehicles[v.ID] = v
 }
 
 // Get a vehicle from a string
 func (fs *FleetStore) Get(id string) (fleet.Vehicle, bool) {
+	fs.updateLock.RLock()
+	defer fs.updateLock.RUnlock()
 	val, ok := fs.vehicles[id]
 	return val, ok
 }
 
 // List all vehicles currently in fleet store by returning slice
 func (fs *FleetStore) List() []fleet.Vehicle {
+	fs.updateLock.RLock()
+	defer fs.updateLock.RUnlock()
 	result := make([]fleet.Vehicle, 0)
 	for _, vehicle := range fs.vehicles {
 		result = append(result, vehicle)
@@ -40,33 +48,69 @@ func (fs *FleetStore) List() []fleet.Vehicle {
 	return result
 }
 
-// UpdateBattery of a passed in id for a vehicle
-func (fs *FleetStore) UpdateBattery(id string, pct float64) error {
+// updateBattery is unexported version for reference
+// handles mutex locking
+func (fs *FleetStore) updateBattery(id string, pct float64) error {
 	val, ok := fs.vehicles[id]
 	if ok {
 		val.BatteryPct = pct
+		val.Timestamp = time.Now()
 		fs.vehicles[id] = val
 		return nil
 	}
 	return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 }
 
-// UpdateSpeed of provided vehicle
-func (fs *FleetStore) UpdateSpeed(id string, speed float64) error {
+// UpdateBattery exported version of updateBattery with mutex locking
+func (fs *FleetStore) UpdateBattery(id string, pct float64) error {
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
+	return fs.updateBattery(id, pct)
+}
+
+// updateSpeed unexported version for mutex locking
+func (fs *FleetStore) updateSpeed(id string, speed float64) error {
 	val, ok := fs.vehicles[id]
 	if ok {
 		val.SpeedKPH = speed
+		val.Timestamp = time.Now()
 		fs.vehicles[id] = val
 		return nil
 	}
 	return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 }
 
-// UpdateTemp of a vehicle
-func (fs *FleetStore) UpdateTemp(id string, temp float64) error {
+// UpdateSpeed of provided vehicle exported version
+func (fs *FleetStore) UpdateSpeed(id string, speed float64) error {
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
+	return fs.updateSpeed(id, speed)
+}
+
+// updateTemp of a vehicle unexported version
+func (fs *FleetStore) updateTemp(id string, temp float64) error {
 	val, ok := fs.vehicles[id]
 	if ok {
 		val.TempC = temp
+		val.Timestamp = time.Now()
+		fs.vehicles[id] = val
+		return nil
+	}
+	return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
+}
+
+// UpdateTemp is the exportable version with locking control
+func (fs *FleetStore) UpdateTemp(id string, temp float64) error {
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
+	return fs.updateTemp(id, temp)
+}
+
+func (fs *FleetStore) updateChgState(id string) error {
+	val, ok := fs.vehicles[id]
+	if ok {
+		val.IsCharging = !val.IsCharging
+		val.Timestamp = time.Now()
 		fs.vehicles[id] = val
 		return nil
 	}
@@ -74,64 +118,52 @@ func (fs *FleetStore) UpdateTemp(id string, temp float64) error {
 }
 
 func (fs *FleetStore) UpdateChgState(id string) error {
-	val, ok := fs.vehicles[id]
-	if ok {
-		val.IsCharging = !val.IsCharging
-		fs.vehicles[id] = val
-		return nil
-	}
-	return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
+	return fs.updateChgState(id)
 }
 
 // UpdateVehicle updates a vehicle in the store based on ID with package updates
 func (fs *FleetStore) UpdateVehicle(id string, update fleet.VehicleUpdate) error {
-	// grab the proper vehicle to update
-	val, ok := fs.vehicles[id]
+	// install write lock
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
 
+	// grab the proper vehicle to update
+	_, ok := fs.vehicles[id]
 	if !ok {
 		return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 	}
 
 	// perform nil checks on fields of update Vehicle
 	var retErr error
-	updated := false
 
 	if update.NewSpd != nil {
-		retErr = fs.UpdateSpeed(id, *update.NewSpd)
+		retErr = fs.updateSpeed(id, *update.NewSpd)
 		if retErr != nil {
 			return retErr
 		}
-		updated = true
 	}
 
 	if update.NewBatPct != nil {
-		retErr = fs.UpdateBattery(id, *update.NewBatPct)
+		retErr = fs.updateBattery(id, *update.NewBatPct)
 		if retErr != nil {
 			return retErr
 		}
-		updated = true
 	}
 
 	if update.NewTemp != nil {
-		retErr = fs.UpdateTemp(id, *update.NewTemp)
+		retErr = fs.updateTemp(id, *update.NewTemp)
 		if retErr != nil {
 			return retErr
 		}
-		updated = true
 	}
 
 	if update.NewChgState != nil {
-		retErr = fs.UpdateChgState(id)
+		retErr = fs.updateChgState(id)
 		if retErr != nil {
 			return retErr
 		}
-		updated = true
-	}
-
-	if updated {
-		val = fs.vehicles[id]
-		val.Timestamp = time.Now()
-		fs.vehicles[id] = val
 	}
 
 	return retErr
@@ -140,6 +172,10 @@ func (fs *FleetStore) UpdateVehicle(id string, update fleet.VehicleUpdate) error
 // Remove removes a vehicle from the fleet store
 // returns the removed vehicle or an error if vehicle not found
 func (fs *FleetStore) Remove(id string) (fleet.Vehicle, error) {
+	// use write lock
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
+
 	val, ok := fs.vehicles[id]
 	if ok {
 		delete(fs.vehicles, id)
@@ -150,6 +186,10 @@ func (fs *FleetStore) Remove(id string) (fleet.Vehicle, error) {
 
 // ListCharging returns slice of all vehicle structs currently charging
 func (fs *FleetStore) ListCharging() []fleet.Vehicle {
+	// use a read lock
+	fs.updateLock.RLock()
+	defer fs.updateLock.RUnlock()
+
 	result := make([]fleet.Vehicle, 0)
 	for _, vehicle := range fs.vehicles {
 		if vehicle.IsCharging {
@@ -161,6 +201,10 @@ func (fs *FleetStore) ListCharging() []fleet.Vehicle {
 
 // Summary provides a Summary struct of the fleet store
 func (fs *FleetStore) Summary() fleet.Summary {
+	// use read lock
+	fs.updateLock.RLock()
+	defer fs.updateLock.RUnlock()
+
 	var chargingCount, totalVehicles int
 	var avgBatteryPct, avgSpeedKPH float64
 

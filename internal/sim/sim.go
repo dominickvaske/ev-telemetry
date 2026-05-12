@@ -17,7 +17,7 @@ func SimulateTick(fs *store.FleetStore) []alert.Alert {
 		vehicle.BatteryPct--
 		id := vehicle.ID
 		if vehicle.BatteryPct < 10.0 {
-			tempAlert := alert.Alert{
+			newAlert := alert.Alert{
 				ID:         "A-" + strconv.Itoa(alert.GlobalAlertID),
 				AlertVEHID: id,
 				Type:       alert.BatteryAlert,
@@ -26,7 +26,7 @@ func SimulateTick(fs *store.FleetStore) []alert.Alert {
 				TimeStamp:  time.Now(),
 			}
 			alert.GlobalAlertID++
-			alerts = append(alerts, tempAlert)
+			alerts = append(alerts, newAlert)
 		}
 		err := fs.UpdateBattery(id, vehicle.BatteryPct)
 		if err != nil { // vehicle not found
