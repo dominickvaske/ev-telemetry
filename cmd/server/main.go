@@ -2,12 +2,32 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
 	"github.com/dominickvaske/ev-telemetry/internal/sim"
 	"github.com/dominickvaske/ev-telemetry/internal/store"
 )
+
+func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan struct{}) {
+	for {
+		select {
+		case v := <-telemetryCh:
+			if err := fs.Set(v); err != nil {
+				log.Printf("ERR: Vehicle %s not found", v.ID)
+			} else if v.BatteryPct < 10.0 {
+				log.Printf("ALERT: vehicle %s battery at %.1f%%", v.ID, v.BatteryPct)
+			}
+		case <-done:
+			return
+		}
+	}
+}
 
 func main() {
 	v1 := fleet.Vehicle{ID: "V-001", BatteryPct: 86.0, SpeedKPH: 0.0, TempC: 21.0, IsCharging: true, Timestamp: time.Now()}
@@ -24,47 +44,49 @@ func main() {
 		fmt.Println(vehicle)
 	}
 
-	// test update battery
-	//err := store.UpdateBattery("Bad-ID", 20)
-	//if err != nil {
-	//	fmt.Println("Update Battery error: ", err)
-	//}
-	//
-	//// test remove function
-	//_, err = store.Remove("Bad-ID")
-	//if err != nil {
-	//	fmt.Println("Remove error: ", err)
-	//}
-
-	// test remove function
-	//v, err := store.Remove("V-002")
-	//if err != nil {
-	//	fmt.Println("Remove error: ", err)
-	//} else {
-	//	fmt.Printf("Removed Vehicle: %s: ", v.ID)
-	//	fmt.Println(v)
-	//}
-
-	// test list charging function
-	//charging := store.ListCharging()
-	//fmt.Println("Vehicles charging: ")
-	//for _, v := range charging {
-	//	fmt.Println(v)
-	//}
-
-	//summary := store.Summary()
-	//fmt.Println("Number of Vehicles: ", summary.TotalVehicles)
-	//fmt.Println("Number Charging: ", summary.ChargingCount)
-	//fmt.Printf("Average Battery Percent: %f\n", summary.AvgBatteryPct)
-	//fmt.Printf("Average Speed: %f\n", summary.AvgSpeedKPH)
-
 	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
 
 	fs.Add(v4)
-	alerts := sim.SimulateTick(fs)
+	//alerts := sim.SimulateTick(fs)
 
-	for _, a := range alerts {
-		fmt.Println(a)
-	}
+	//for _, a := range alerts {
+	//	fmt.Println(a)
+	//}
 
+	telemetryCh := make(chan fleet.Vehicle)
+	done := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(5)
+
+	// launch go routines for each vehicle and ingest
+	go func() {
+		defer wg.Done()
+		sim.SimulateVehicle(v1, telemetryCh, done)
+	}()
+	go func() {
+		defer wg.Done()
+		sim.SimulateVehicle(v2, telemetryCh, done)
+	}()
+	go func() {
+		defer wg.Done()
+		sim.SimulateVehicle(v3, telemetryCh, done)
+	}()
+	go func() {
+		defer wg.Done()
+		sim.SimulateVehicle(v4, telemetryCh, done)
+	}()
+
+	go func() {
+		defer wg.Done()
+		Ingest(fs, telemetryCh, done)
+	}()
+
+	// wait for signal.Notify and then close done if received
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	close(done)
+	wg.Wait()
+	fmt.Println("\nAll routines closed. Exiting....")
 }
