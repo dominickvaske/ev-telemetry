@@ -37,6 +37,17 @@ func (fs *FleetStore) Get(id string) (fleet.Vehicle, bool) {
 	return val, ok
 }
 
+// Set a vehicle by updating the current value assuming it exists
+func (fs *FleetStore) Set(v fleet.Vehicle) error {
+	fs.updateLock.Lock()
+	defer fs.updateLock.Unlock()
+	if _, ok := fs.vehicles[v.ID]; !ok {
+		return ErrVehicleNotFound
+	}
+	fs.vehicles[v.ID] = v
+	return nil
+}
+
 // List all vehicles currently in fleet store by returning slice
 func (fs *FleetStore) List() []fleet.Vehicle {
 	fs.updateLock.RLock()
