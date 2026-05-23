@@ -7,12 +7,12 @@ import "time"
 // Vehicle is a struct to simulate all vehicles
 // in the fleet
 type Vehicle struct {
-	ID         string
-	BatteryPct float64
-	SpeedKPH   float64
-	TempC      float64
-	IsCharging bool
-	Timestamp  time.Time
+	ID         string    `json:"id"`
+	BatteryPct float64   `json:"battery_pct"`
+	SpeedKPH   float64   `json:"speed_kph"`
+	TempC      float64   `json:"temp_c"`
+	IsCharging bool      `json:"is_charging"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // VehicleUpdate is a type that includes all information
@@ -28,8 +28,8 @@ type VehicleUpdate struct {
 // Summary is a type used to summarize
 // all information relating to a fleet
 type Summary struct {
-	TotalVehicles int
-	ChargingCount int
-	AvgBatteryPct float64
-	AvgSpeedKPH   float64
+	TotalVehicles int     `json:"total_vehicles"`
+	ChargingCount int     `json:"charging_count"`
+	AvgBatteryPct float64 `json:"avg_battery_pct"`
+	AvgSpeedKPH   float64 `json:"avg_speed_kph"`
 }

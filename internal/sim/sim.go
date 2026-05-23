@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -17,6 +18,7 @@ func SimulateVehicle(v fleet.Vehicle, telemetryCh chan<- fleet.Vehicle, done cha
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	// every tick, update a vehicles battery and timestamp and then send across channel
 	for {
 		select {
 		case <-ticker.C:
@@ -34,7 +36,7 @@ func SimulateVehicle(v fleet.Vehicle, telemetryCh chan<- fleet.Vehicle, done cha
 func SimulateTick(fs *store.FleetStore) []alert.Alert {
 	alerts := make([]alert.Alert, 0)
 
-	for _, vehicle := range fs.List() {
+	for _, vehicle := range fs.List(context.Background()) {
 		vehicle.BatteryPct--
 		id := vehicle.ID
 		if vehicle.BatteryPct < 10.0 {

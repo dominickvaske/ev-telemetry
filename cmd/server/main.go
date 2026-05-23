@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -14,11 +15,13 @@ import (
 	"github.com/dominickvaske/ev-telemetry/internal/store"
 )
 
+// Ingest is a function that reads from a telemetry channel and then checks
+// for a battery alert
 func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan struct{}) {
 	for {
 		select {
 		case v := <-telemetryCh:
-			if err := fs.Set(v); err != nil {
+			if err := fs.Set(context.Background(), v); err != nil {
 				log.Printf("ERR: Vehicle %s not found", v.ID)
 			} else if v.BatteryPct < 10.0 {
 				log.Printf("ALERT: vehicle %s battery at %.1f%%", v.ID, v.BatteryPct)
@@ -36,17 +39,17 @@ func main() {
 
 	fs := store.NewFleetStore()
 
-	fs.Add(v1)
-	fs.Add(v2)
-	fs.Add(v3)
+	fs.Add(context.Background(), v1)
+	fs.Add(context.Background(), v2)
+	fs.Add(context.Background(), v3)
 
-	for _, vehicle := range fs.List() {
+	for _, vehicle := range fs.List(context.Background()) {
 		fmt.Println(vehicle)
 	}
 
 	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
 
-	fs.Add(v4)
+	fs.Add(context.Background(), v4)
 	//alerts := sim.SimulateTick(fs)
 
 	//for _, a := range alerts {
@@ -58,7 +61,7 @@ func main() {
 	wg := sync.WaitGroup{}
 	wg.Add(5)
 
-	// launch go routines for each vehicle and ingest
+	// launch goroutines for each vehicle and ingest
 	go func() {
 		defer wg.Done()
 		sim.SimulateVehicle(v1, telemetryCh, done)
@@ -76,6 +79,7 @@ func main() {
 		sim.SimulateVehicle(v4, telemetryCh, done)
 	}()
 
+	// launch ingest goroutine to sit and wait for passed in vehicles
 	go func() {
 		defer wg.Done()
 		Ingest(fs, telemetryCh, done)

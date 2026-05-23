@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -23,14 +24,14 @@ func NewFleetStore() *FleetStore {
 }
 
 // Add a vehicle to the Fleet Store
-func (fs *FleetStore) Add(v fleet.Vehicle) {
+func (fs *FleetStore) Add(ctx context.Context, v fleet.Vehicle) {
 	fs.updateLock.Lock()
 	defer fs.updateLock.Unlock()
 	fs.vehicles[v.ID] = v
 }
 
 // Get a vehicle from a string
-func (fs *FleetStore) Get(id string) (fleet.Vehicle, bool) {
+func (fs *FleetStore) Get(ctx context.Context, id string) (fleet.Vehicle, bool) {
 	fs.updateLock.RLock()
 	defer fs.updateLock.RUnlock()
 	val, ok := fs.vehicles[id]
@@ -38,7 +39,7 @@ func (fs *FleetStore) Get(id string) (fleet.Vehicle, bool) {
 }
 
 // Set a vehicle by updating the current value assuming it exists
-func (fs *FleetStore) Set(v fleet.Vehicle) error {
+func (fs *FleetStore) Set(ctx context.Context, v fleet.Vehicle) error {
 	fs.updateLock.Lock()
 	defer fs.updateLock.Unlock()
 	if _, ok := fs.vehicles[v.ID]; !ok {
@@ -49,7 +50,7 @@ func (fs *FleetStore) Set(v fleet.Vehicle) error {
 }
 
 // List all vehicles currently in fleet store by returning slice
-func (fs *FleetStore) List() []fleet.Vehicle {
+func (fs *FleetStore) List(ctx context.Context) []fleet.Vehicle {
 	fs.updateLock.RLock()
 	defer fs.updateLock.RUnlock()
 	result := make([]fleet.Vehicle, 0)
@@ -117,6 +118,7 @@ func (fs *FleetStore) UpdateTemp(id string, temp float64) error {
 	return fs.updateTemp(id, temp)
 }
 
+// updateChgState takes in a vehicle id and updates whether it's charging or not
 func (fs *FleetStore) updateChgState(id string) error {
 	val, ok := fs.vehicles[id]
 	if ok {
@@ -128,6 +130,7 @@ func (fs *FleetStore) updateChgState(id string) error {
 	return fmt.Errorf("vehicle %s not found: %w", id, ErrVehicleNotFound)
 }
 
+// UpdateChgState is the exportable, concurrent safe function
 func (fs *FleetStore) UpdateChgState(id string) error {
 	fs.updateLock.Lock()
 	defer fs.updateLock.Unlock()
