@@ -12,22 +12,22 @@ import (
 // Server is a struct that the main.go package can use to
 // create a server for the eventual frontend to communicate with
 type Server struct {
-	storePtr *store.FleetStore
-	logPtr   *alert.Log
-	muxPtr   *chi.Mux
+	store  *store.FleetStore
+	alerts *alert.Log
+	router *chi.Mux
 }
 
 func NewServer(s *store.FleetStore, a *alert.Log) *Server {
 	return &Server{
-		storePtr: s,
-		logPtr:   a,
-		muxPtr:   chi.NewRouter(),
+		store:  s,
+		alerts: a,
+		router: chi.NewRouter(),
 	}
 }
 
 // ServeHTTP allows Server to meet Handler interface spec
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.muxPtr.ServeHTTP(w, r)
+	s.router.ServeHTTP(w, r)
 }
 
 // writeJSON serves as a utility function to remove repetition of initial response to client
