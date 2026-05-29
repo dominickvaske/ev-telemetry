@@ -18,11 +18,14 @@ type Server struct {
 }
 
 func NewServer(s *store.FleetStore, a *alert.Log) *Server {
-	return &Server{
+	srv := Server{
 		store:  s,
 		alerts: a,
 		router: chi.NewRouter(),
 	}
+
+	srv.router.Get("/fleet", srv.handleGetFleet)
+	return &srv
 }
 
 // ServeHTTP allows Server to meet Handler interface spec
