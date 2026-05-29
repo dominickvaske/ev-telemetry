@@ -17,12 +17,12 @@ const (
 var GlobalAlertID = 1
 
 type Alert struct {
-	ID         string    // Unique ID for alert event
-	AlertVEHID string    // ID of the vehicle with the alert
-	Type       AlertType // AlertType (string) for reason for alert
-	Value      float64   // raw value causing alert
-	Message    string    // human-readable error message
-	TimeStamp  time.Time // timestamp of alert creation
+	ID        string    `json:"id"`         // Unique ID for alert event
+	VehicleID string    `json:"vehicle_id"` // ID of the vehicle with the alert
+	Type      AlertType `json:"type"`       // AlertType (string) for reason for alert
+	Value     float64   `json:"value"`      // raw value causing alert
+	Message   string    `json:"message"`    // human-readable error message
+	TimeStamp time.Time `json:"timestamp"`  // timestamp of alert creation
 }
 
 type Log struct {

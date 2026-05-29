@@ -41,12 +41,12 @@ func SimulateTick(fs *store.FleetStore) []alert.Alert {
 		id := vehicle.ID
 		if vehicle.BatteryPct < 10.0 {
 			newAlert := alert.Alert{
-				ID:         "A-" + strconv.Itoa(alert.GlobalAlertID),
-				AlertVEHID: id,
-				Type:       alert.BatteryAlert,
-				Value:      vehicle.BatteryPct,
-				Message:    "Battery less than 10 percent",
-				TimeStamp:  time.Now(),
+				ID:        "A-" + strconv.Itoa(alert.GlobalAlertID),
+				VehicleID: id,
+				Type:      alert.BatteryAlert,
+				Value:     vehicle.BatteryPct,
+				Message:   "Battery less than 10 percent",
+				TimeStamp: time.Now(),
 			}
 			alert.GlobalAlertID++
 			alerts = append(alerts, newAlert)
