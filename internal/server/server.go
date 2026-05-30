@@ -28,6 +28,8 @@ func NewServer(s *store.FleetStore, a *alert.Log) *Server {
 
 	srv.router.Get("/fleet", srv.handleGetFleet)
 	srv.router.Get("/vehicle/{id}", srv.handleGetVehicle)
+	srv.router.Get("/alerts", srv.handleGetAlerts)
+	srv.router.Post("/telemetry", srv.handlePostTelemetry)
 	return &srv
 }
 
