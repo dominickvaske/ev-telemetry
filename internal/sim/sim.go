@@ -1,26 +1,25 @@
 package sim
 
 import (
+	"math"
+	"math/rand"
 	"time"
 
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
 )
 
-// SimulateVehicle runs simulation for a single vehicle v
-// v: fleet.Vehicle being simulated on specific goroutine
-// telemetryCh: channel shared by ingest function to know when to update alerts
-// done: channel shared with main to receive done signal
+const ambientTempC = 22.0
+
+// SimulateVehicle runs a per-vehicle simulation loop, sending state updates
+// every second until the done channel is closed.
 func SimulateVehicle(v fleet.Vehicle, telemetryCh chan<- fleet.Vehicle, done chan struct{}) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	// every tick, update a vehicles battery and timestamp and then send across channel
 	for {
 		select {
 		case <-ticker.C:
-			if v.BatteryPct > 0 {
-				v.BatteryPct--
-			}
+			v = tick(v)
 			v.Timestamp = time.Now()
 			telemetryCh <- v
 		case <-done:
@@ -29,30 +28,40 @@ func SimulateVehicle(v fleet.Vehicle, telemetryCh chan<- fleet.Vehicle, done cha
 	}
 }
 
-// SimulateTick runs through all vehicles and drops battery
-// percentage by one point to simulate a drive time instance
-//func SimulateTick(fs *store.FleetStore) []alert.Alert {
-//	alerts := make([]alert.Alert, 0)
-//
-//	for _, vehicle := range fs.List(context.Background()) {
-//		vehicle.BatteryPct--
-//		id := vehicle.ID
-//		if vehicle.BatteryPct < 10.0 {
-//			newAlert := alert.Alert{
-//				ID:        "A-" + strconv.Itoa(alert.GlobalAlertID),
-//				VehicleID: id,
-//				Type:      alert.BatteryAlert,
-//				Value:     vehicle.BatteryPct,
-//				Message:   "Battery less than 10 percent",
-//				TimeStamp: time.Now(),
-//			}
-//			alert.GlobalAlertID++
-//			alerts = append(alerts, newAlert)
-//		}
-//		err := fs.UpdateBattery(id, vehicle.BatteryPct)
-//		if err != nil { // vehicle not found
-//			continue
-//		}
-//	}
-//	return alerts
-//}
+// tick advances vehicle state by one second.
+func tick(v fleet.Vehicle) fleet.Vehicle {
+	if v.IsCharging {
+		// Charging: recover battery at 1.5% per second, not moving.
+		// Stop charging once battery reaches 80%.
+		v.BatteryPct = math.Min(v.BatteryPct+1.5, 100.0)
+		v.SpeedKPH = 0
+		if v.BatteryPct >= 80.0 {
+			v.IsCharging = false
+		}
+	} else {
+		// Driving: drain battery based on speed. Faster driving = faster drain.
+		drain := 0.3 + v.SpeedKPH/300.0
+		v.BatteryPct = math.Max(v.BatteryPct-drain, 0)
+
+		if v.BatteryPct == 0 {
+			// Dead battery: pull over and start charging.
+			v.SpeedKPH = 0
+			v.IsCharging = true
+		} else {
+			// Vary speed by up to ±5 kph each tick, clamped to 0–120.
+			delta := float64(rand.Intn(11) - 5)
+			v.SpeedKPH = math.Max(0, math.Min(120, v.SpeedKPH+delta))
+		}
+	}
+
+	// Temperature drifts toward a target driven by speed, falls toward ambient when slow.
+	targetTemp := ambientTempC + v.SpeedKPH*0.15
+	v.TempC += (targetTemp - v.TempC) * 0.1
+
+	// 2% chance per tick of a motor stress spike (+5°C).
+	if rand.Float64() < 0.02 {
+		v.TempC += 5.0
+	}
+
+	return v
+}
