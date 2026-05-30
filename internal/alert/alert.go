@@ -2,6 +2,7 @@ package alert
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -13,8 +14,8 @@ const (
 	TempAlert    AlertType = "TEMPERATURE"
 )
 
-// TODO: not thread-safe, replace with atomic or mutex in Phase 2
-var GlobalAlertID = 1
+// GlobalAlertID is concurrent safe
+var GlobalAlertID atomic.Int32
 
 type Alert struct {
 	ID        string    `json:"id"`         // Unique ID for alert event

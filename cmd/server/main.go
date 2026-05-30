@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/dominickvaske/ev-telemetry/internal/alert"
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
 	"github.com/dominickvaske/ev-telemetry/internal/sim"
 	"github.com/dominickvaske/ev-telemetry/internal/store"
@@ -17,14 +19,23 @@ import (
 
 // Ingest is a function that reads from a telemetry channel and then checks
 // for a battery alert
-func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan struct{}) {
+func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan struct{}, alertLog *alert.Log) {
 	for {
 		select {
 		case v := <-telemetryCh:
 			if err := fs.Set(context.Background(), v); err != nil {
 				log.Printf("ERR: Vehicle %s not found", v.ID)
 			} else if v.BatteryPct < 10.0 {
-				log.Printf("ALERT: vehicle %s battery at %.1f%%", v.ID, v.BatteryPct)
+				id := alert.GlobalAlertID.Add(1)
+				a := alert.Alert{
+					ID:        "A-" + strconv.Itoa(int(id)),
+					VehicleID: v.ID,
+					Type:      alert.BatteryAlert,
+					Value:     v.BatteryPct,
+					Message:   "Battery less than 10 percent",
+					TimeStamp: time.Now(),
+				}
+				alertLog.Append(a)
 			}
 		case <-done:
 			return
@@ -80,9 +91,10 @@ func main() {
 	}()
 
 	// launch ingest goroutine to sit and wait for passed in vehicles
+	alertLog := alert.NewAlertLog()
 	go func() {
 		defer wg.Done()
-		Ingest(fs, telemetryCh, done)
+		Ingest(fs, telemetryCh, done, alertLog)
 	}()
 
 	// wait for signal.Notify and then close done if received
