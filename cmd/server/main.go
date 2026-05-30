@@ -26,9 +26,10 @@ func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan st
 	for {
 		select {
 		case v := <-telemetryCh:
+			oldV, _ := fs.Get(context.Background(), v.ID)
 			if err := fs.Set(context.Background(), v); err != nil {
 				log.Printf("ERR: Vehicle %s not found", v.ID)
-			} else if v.BatteryPct < 10.0 {
+			} else if v.BatteryPct < 10.0 && oldV.BatteryPct >= 10.0 {
 				id := alert.GlobalAlertID.Add(1)
 				a := alert.Alert{
 					ID:        "A-" + strconv.Itoa(int(id)),

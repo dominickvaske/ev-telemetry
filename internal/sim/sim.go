@@ -18,7 +18,9 @@ func SimulateVehicle(v fleet.Vehicle, telemetryCh chan<- fleet.Vehicle, done cha
 	for {
 		select {
 		case <-ticker.C:
-			v.BatteryPct--
+			if v.BatteryPct > 0 {
+				v.BatteryPct--
+			}
 			v.Timestamp = time.Now()
 			telemetryCh <- v
 		case <-done:
