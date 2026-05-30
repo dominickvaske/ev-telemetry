@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/dominickvaske/ev-telemetry/internal/alert"
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
+	"github.com/dominickvaske/ev-telemetry/internal/server"
 	"github.com/dominickvaske/ev-telemetry/internal/sim"
 	"github.com/dominickvaske/ev-telemetry/internal/store"
 )
@@ -44,6 +47,11 @@ func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan st
 }
 
 func main() {
+	alertLog := alert.NewAlertLog()
+
+	port := flag.String("port", "8080", "HTTP server port")
+	flag.Parse()
+
 	v1 := fleet.Vehicle{ID: "V-001", BatteryPct: 86.0, SpeedKPH: 0.0, TempC: 21.0, IsCharging: true, Timestamp: time.Now()}
 	v2 := fleet.Vehicle{ID: "V-002", BatteryPct: 70.0, SpeedKPH: 66.0, TempC: 24.0, IsCharging: false, Timestamp: time.Now()}
 	v3 := fleet.Vehicle{ID: "V-003", BatteryPct: 43.0, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
@@ -61,11 +69,6 @@ func main() {
 	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
 
 	fs.Add(context.Background(), v4)
-	//alerts := sim.SimulateTick(fs)
-
-	//for _, a := range alerts {
-	//	fmt.Println(a)
-	//}
 
 	telemetryCh := make(chan fleet.Vehicle)
 	done := make(chan struct{})
@@ -91,10 +94,19 @@ func main() {
 	}()
 
 	// launch ingest goroutine to sit and wait for passed in vehicles
-	alertLog := alert.NewAlertLog()
 	go func() {
 		defer wg.Done()
 		Ingest(fs, telemetryCh, done, alertLog)
+	}()
+
+	// start a server in its own go routine
+	// not in wait group since it doesn't depend on the done channel
+	srv := server.NewServer(fs, alertLog)
+	go func() {
+		log.Printf("listening on : %s", *port)
+		if err := http.ListenAndServe(":"+*port, srv); err != nil {
+			log.Fatal(err)
+		}
 	}()
 
 	// wait for signal.Notify and then close done if received
