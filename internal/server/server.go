@@ -17,6 +17,8 @@ type Server struct {
 	router *chi.Mux
 }
 
+// NewServer creates a new server struct with a chi router and
+// store and alert fields for access in handlers
 func NewServer(s *store.FleetStore, a *alert.Log) *Server {
 	srv := Server{
 		store:  s,
@@ -25,6 +27,7 @@ func NewServer(s *store.FleetStore, a *alert.Log) *Server {
 	}
 
 	srv.router.Get("/fleet", srv.handleGetFleet)
+	srv.router.Get("/vehicle/{id}", srv.handleGetVehicle)
 	return &srv
 }
 

@@ -30,7 +30,7 @@ func (fs *FleetStore) Add(ctx context.Context, v fleet.Vehicle) {
 	fs.vehicles[v.ID] = v
 }
 
-// Get a vehicle from a string
+// Get a vehicle from a string, returns bool for if it exists or not
 func (fs *FleetStore) Get(ctx context.Context, id string) (fleet.Vehicle, bool) {
 	fs.updateLock.RLock()
 	defer fs.updateLock.RUnlock()
