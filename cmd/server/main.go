@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -21,7 +20,7 @@ import (
 )
 
 // Ingest is a function that reads from a telemetry channel and then checks
-// for a battery alert
+// for a possible alert
 func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan struct{}, alertLog *alert.Log) {
 	for {
 		select {
@@ -29,17 +28,15 @@ func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan st
 			oldV, _ := fs.Get(context.Background(), v.ID)
 			if err := fs.Set(context.Background(), v); err != nil {
 				log.Printf("ERR: Vehicle %s not found", v.ID)
-			} else if v.BatteryPct < 10.0 && oldV.BatteryPct >= 10.0 {
-				id := alert.GlobalAlertID.Add(1)
-				a := alert.Alert{
-					ID:        "A-" + strconv.Itoa(int(id)),
-					VehicleID: v.ID,
-					Type:      alert.BatteryAlert,
-					Value:     v.BatteryPct,
-					Message:   "Battery less than 10 percent",
-					TimeStamp: time.Now(),
-				}
-				alertLog.Append(a)
+			}
+			if a := alert.CheckBattery(oldV, v); a != nil {
+				alertLog.Append(*a)
+			}
+			if a := alert.CheckSpeed(oldV, v); a != nil {
+				alertLog.Append(*a)
+			}
+			if a := alert.CheckTemp(oldV, v); a != nil {
+				alertLog.Append(*a)
 			}
 		case <-done:
 			return

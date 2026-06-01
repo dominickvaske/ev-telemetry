@@ -95,7 +95,7 @@ func CheckSpeed(prev, curr fleet.Vehicle) *Alert {
 			ID:        "A-" + strconv.Itoa(id),
 			VehicleID: curr.ID,
 			Type:      SpeedAlert,
-			Value:     curr.TempC,
+			Value:     curr.SpeedKPH,
 			Message:   "Vehicle Speed greater than 100KPH",
 			TimeStamp: time.Now(),
 		}

@@ -76,8 +76,8 @@ func TestCheckTemp(t *testing.T) {
 		IsCharging: false,
 		Timestamp:  time.Now(),
 	}
-	if a := CheckSpeed(prev, curr); a != nil {
-		t.Error("Speed alert fired on change 55->60 percent")
+	if a := CheckTemp(prev, curr); a != nil {
+		t.Error("Speed alert fired on change 55->60 KPH")
 	}
 }
 
@@ -101,7 +101,7 @@ func TestCheckSpeed(t *testing.T) {
 	}
 
 	if a := CheckSpeed(prev, curr); a == nil {
-		t.Error("Speed alert returned nil on change 75->100 percent")
+		t.Error("Speed alert returned nil on change 75->100 KPH")
 	}
 
 	prev = curr
