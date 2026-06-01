@@ -1,9 +1,12 @@
 package alert
 
 import (
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/dominickvaske/ev-telemetry/internal/fleet"
 )
 
 type AlertType string
@@ -52,4 +55,35 @@ func (l *Log) All() []Alert {
 	defer l.lock.RUnlock()
 
 	return append(make([]Alert, 0), l.alerts...)
+}
+
+// CheckBattery checks if a vehicle meets alert criteria for battery alert
+func CheckBattery(prev, curr fleet.Vehicle) *Alert {
+	if prev.BatteryPct >= 10.0 && curr.BatteryPct < 10 {
+		id := int(GlobalAlertID.Add(1))
+		return &Alert{
+			ID:        "A-" + strconv.Itoa(id),
+			VehicleID: curr.ID,
+			Type:      BatteryAlert,
+			Value:     curr.BatteryPct,
+			Message:   "Battery less than 10 percent",
+			TimeStamp: time.Now(),
+		}
+	}
+	return nil
+}
+
+func CheckTemp(prev, curr fleet.Vehicle) *Alert {
+	if prev.TempC < 50.0 && curr.TempC >= 50.0 {
+		id := int(GlobalAlertID.Add(1))
+		return &Alert{
+			ID:        "A-" + strconv.Itoa(id),
+			VehicleID: curr.ID,
+			Type:      TempAlert,
+			Value:     curr.TempC,
+			Message:   "Vehicle Temperature greater than 50C",
+			TimeStamp: time.Now(),
+		}
+	}
+	return nil
 }
