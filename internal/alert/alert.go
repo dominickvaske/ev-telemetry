@@ -87,3 +87,18 @@ func CheckTemp(prev, curr fleet.Vehicle) *Alert {
 	}
 	return nil
 }
+
+func CheckSpeed(prev, curr fleet.Vehicle) *Alert {
+	if prev.SpeedKPH < 100.0 && curr.SpeedKPH >= 100.0 {
+		id := int(GlobalAlertID.Add(1))
+		return &Alert{
+			ID:        "A-" + strconv.Itoa(id),
+			VehicleID: curr.ID,
+			Type:      SpeedAlert,
+			Value:     curr.TempC,
+			Message:   "Vehicle Speed greater than 100KPH",
+			TimeStamp: time.Now(),
+		}
+	}
+	return nil
+}
