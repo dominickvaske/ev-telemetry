@@ -17,11 +17,17 @@ import (
 	"github.com/dominickvaske/ev-telemetry/internal/server"
 	"github.com/dominickvaske/ev-telemetry/internal/sim"
 	"github.com/dominickvaske/ev-telemetry/internal/store"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 // Ingest is a function that reads from a telemetry channel and then checks
 // for a possible alert
-func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan struct{}, alertLog *alert.Log) {
+func Ingest(fs *store.FleetStore,
+	telemetryCh <-chan fleet.Vehicle,
+	done chan struct{},
+	alertLog *alert.Log,
+	pool *pgxpool.Pool) {
 	for {
 		select {
 		case v := <-telemetryCh:
@@ -29,6 +35,14 @@ func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan st
 			if err := fs.Set(context.Background(), v); err != nil {
 				log.Printf("ERR: Vehicle %s not found", v.ID)
 			}
+			// INSERT into database telemetry_events table
+			query := `INSERT INTO telemetry_events (vehicle_id, battery_pct, speed_kph, temp_c, is_charging, timestamp) 
+					  VALUES ($1, $2, $3, $4, $5, $6)`
+			_, err := pool.Exec(context.Background(), query, v.ID, v.BatteryPct, v.SpeedKPH, v.TempC, v.IsCharging, v.Timestamp)
+			if err != nil {
+				log.Printf("Query execution failed: %v\n", err)
+			}
+
 			if a := alert.CheckBattery(oldV, v); a != nil {
 				alertLog.Append(*a)
 			}
@@ -45,6 +59,10 @@ func Ingest(fs *store.FleetStore, telemetryCh <-chan fleet.Vehicle, done chan st
 }
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	alertLog := alert.NewAlertLog()
 
 	port := flag.String("port", "8080", "HTTP server port")
@@ -92,9 +110,13 @@ func main() {
 	}()
 
 	// launch ingest goroutine to sit and wait for passed in vehicles
+	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal("Error opening pgx pool")
+	}
 	go func() {
 		defer wg.Done()
-		Ingest(fs, telemetryCh, done, alertLog)
+		Ingest(fs, telemetryCh, done, alertLog, pool)
 	}()
 
 	// start a server in its own go routine
