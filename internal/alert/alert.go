@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
+	"github.com/dominickvaske/ev-telemetry/internal/metrics"
 )
 
 type AlertType string
@@ -47,6 +48,9 @@ func (l *Log) Append(a Alert) {
 	defer l.lock.Unlock()
 
 	l.alerts = append(l.alerts, a)
+
+	// update alerts metric counter
+	metrics.AlertsCounter.Inc()
 }
 
 // All returns a copy of the current slice of alerts from log

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dominickvaske/ev-telemetry/internal/alert"
 	"github.com/dominickvaske/ev-telemetry/internal/fleet"
+	"github.com/dominickvaske/ev-telemetry/internal/metrics"
 	"github.com/dominickvaske/ev-telemetry/internal/server"
 	"github.com/dominickvaske/ev-telemetry/internal/sim"
 	"github.com/dominickvaske/ev-telemetry/internal/store"
@@ -42,6 +43,9 @@ func Ingest(fs *store.FleetStore,
 			if err != nil {
 				log.Printf("Query execution failed: %v\n", err)
 			}
+
+			// update counter metric
+			metrics.EventsCounter.Inc()
 
 			if a := alert.CheckBattery(oldV, v); a != nil {
 				alertLog.Append(*a)

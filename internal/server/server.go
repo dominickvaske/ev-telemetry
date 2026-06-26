@@ -7,6 +7,7 @@ import (
 	"github.com/dominickvaske/ev-telemetry/internal/alert"
 	"github.com/dominickvaske/ev-telemetry/internal/store"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server is a struct that the main.go package can use to
@@ -30,6 +31,7 @@ func NewServer(s *store.FleetStore, a *alert.Log) *Server {
 	srv.router.Get("/vehicle/{id}", srv.handleGetVehicle)
 	srv.router.Get("/alerts", srv.handleGetAlerts)
 	srv.router.Post("/telemetry", srv.handlePostTelemetry)
+	srv.router.Handle("/metrics", promhttp.Handler())
 	return &srv
 }
 
