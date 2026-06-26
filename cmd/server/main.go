@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,6 +20,31 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
+
+// saveAlert saves a passed in alert to the database referenced by the passed in pool
+func saveAlert(ctx context.Context, pool *pgxpool.Pool, a alert.Alert) {
+	query := `INSERT INTO alerts (vehicle_id, alert_type, value, message, timestamp)
+              VALUES ($1, $2, $3, $4, $5)`
+	_, err := pool.Exec(ctx, query, a.VehicleID, a.Type, a.Value, a.Message, a.TimeStamp)
+	if err != nil {
+		slog.Error("failed to save alert", "err", err, "vehicle_id", a.VehicleID)
+	}
+}
+
+func checkAlerts(pool *pgxpool.Pool, alertLog *alert.Log, oldV fleet.Vehicle, v fleet.Vehicle) {
+	if a := alert.CheckBattery(oldV, v); a != nil {
+		alertLog.Append(*a)
+		saveAlert(context.Background(), pool, *a)
+	}
+	if a := alert.CheckSpeed(oldV, v); a != nil {
+		alertLog.Append(*a)
+		saveAlert(context.Background(), pool, *a)
+	}
+	if a := alert.CheckTemp(oldV, v); a != nil {
+		alertLog.Append(*a)
+		saveAlert(context.Background(), pool, *a)
+	}
+}
 
 // Ingest is a function that reads from a telemetry channel and then checks
 // for a possible alert
@@ -51,15 +75,8 @@ func Ingest(fs *store.FleetStore,
 			// update counter metric
 			metrics.EventsCounter.Inc()
 
-			if a := alert.CheckBattery(oldV, v); a != nil {
-				alertLog.Append(*a)
-			}
-			if a := alert.CheckSpeed(oldV, v); a != nil {
-				alertLog.Append(*a)
-			}
-			if a := alert.CheckTemp(oldV, v); a != nil {
-				alertLog.Append(*a)
-			}
+			// check possible alerts and log
+			checkAlerts(pool, alertLog, oldV, v)
 		case <-done:
 			return
 		}
@@ -89,9 +106,9 @@ func main() {
 	fs.Add(context.Background(), v2)
 	fs.Add(context.Background(), v3)
 
-	for _, vehicle := range fs.List(context.Background()) {
-		fmt.Println(vehicle)
-	}
+	//for _, vehicle := range fs.List(context.Background()) {
+	//	fmt.Println(vehicle)
+	//}
 
 	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
 
