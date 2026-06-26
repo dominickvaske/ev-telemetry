@@ -39,11 +39,15 @@ func Ingest(fs *store.FleetStore,
 			// INSERT into database telemetry_events table
 			query := `INSERT INTO telemetry_events (vehicle_id, battery_pct, speed_kph, temp_c, is_charging, timestamp) 
 					  VALUES ($1, $2, $3, $4, $5, $6)`
+			start := time.Now()
 			_, err := pool.Exec(context.Background(), query, v.ID, v.BatteryPct, v.SpeedKPH, v.TempC, v.IsCharging, v.Timestamp)
+			duration := time.Since(start).Seconds()
 			if err != nil {
 				log.Printf("Query execution failed: %v\n", err)
 			}
 
+			// update matrics tracking for latency
+			metrics.LatencyHist.Observe(duration)
 			// update counter metric
 			metrics.EventsCounter.Inc()
 

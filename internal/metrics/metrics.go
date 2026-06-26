@@ -19,13 +19,13 @@ var (
 		},
 	)
 
-	RoutineGauge = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: "ev",
-			Name:      "go_routines_gauge",
-			Help:      "number of go routines currently running",
-		},
-	)
+	//RoutineGauge = prometheus.NewGauge(
+	//	prometheus.GaugeOpts{
+	//		Namespace: "ev",
+	//		Name:      "go_routines_gauge",
+	//		Help:      "number of go routines currently running",
+	//	},
+	//)
 
 	LatencyHist = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
@@ -39,6 +39,6 @@ var (
 func init() {
 	prometheus.MustRegister(EventsCounter)
 	prometheus.MustRegister(AlertsCounter)
-	prometheus.MustRegister(RoutineGauge)
+	//prometheus.MustRegister(RoutineGauge)
 	prometheus.MustRegister(LatencyHist)
 }
