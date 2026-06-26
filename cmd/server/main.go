@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,7 +34,7 @@ func Ingest(fs *store.FleetStore,
 		case v := <-telemetryCh:
 			oldV, _ := fs.Get(context.Background(), v.ID)
 			if err := fs.Set(context.Background(), v); err != nil {
-				log.Printf("ERR: Vehicle %s not found", v.ID)
+				slog.Error("vehicle not found", "vehicle_id", v.ID)
 			}
 			// INSERT into database telemetry_events table
 			query := `INSERT INTO telemetry_events (vehicle_id, battery_pct, speed_kph, temp_c, is_charging, timestamp) 
@@ -43,7 +43,7 @@ func Ingest(fs *store.FleetStore,
 			_, err := pool.Exec(context.Background(), query, v.ID, v.BatteryPct, v.SpeedKPH, v.TempC, v.IsCharging, v.Timestamp)
 			duration := time.Since(start).Seconds()
 			if err != nil {
-				log.Printf("Query execution failed: %v\n", err)
+				slog.Error("query execution failed", "err", err)
 			}
 
 			// update matrics tracking for latency
@@ -67,8 +67,11 @@ func Ingest(fs *store.FleetStore,
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		slog.Error("error loading .env file", "err", err)
+		os.Exit(1)
 	}
 
 	alertLog := alert.NewAlertLog()
@@ -120,7 +123,8 @@ func main() {
 	// launch ingest goroutine to sit and wait for passed in vehicles
 	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
-		log.Fatal("Error opening pgx pool")
+		slog.Error("error opening pgx pool", "err", err)
+		os.Exit(1)
 	}
 	go func() {
 		defer wg.Done()
@@ -131,9 +135,10 @@ func main() {
 	// not in wait group since it doesn't depend on the done channel
 	srv := server.NewServer(fs, alertLog)
 	go func() {
-		log.Printf("listening on : %s", *port)
+		slog.Info("server starting", "port", *port)
 		if err := http.ListenAndServe(":"+*port, srv); err != nil {
-			log.Fatal(err)
+			slog.Error("server failed", "err", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -144,5 +149,5 @@ func main() {
 
 	close(done)
 	wg.Wait()
-	fmt.Println("\nAll routines closed. Exiting....")
+	slog.Info("all routines closed, exiting....")
 }
