@@ -14,7 +14,7 @@ import (
 )
 
 func testServer() *Server {
-	return NewServer(store.NewFleetStore(), alert.NewAlertLog())
+	return NewServer(store.NewFleetStore(), alert.NewAlertLog(), "8080")
 }
 
 func seedVehicle(s *Server, id string) fleet.Vehicle {
