@@ -1,51 +1,73 @@
 # ev-telemetry
 
-A real-time electric vehicle fleet telemetry system built in Go. This project simulates a fleet of EVs reporting live telemetry data — battery level, speed, temperature — and exposes that data through a JSON REST API.
+A real-time electric vehicle fleet telemetry system built in Go. Simulates a fleet of EVs reporting live telemetry — battery level, speed, temperature — ingests that data into PostgreSQL, fires alerts on critical thresholds, and displays everything on a live web dashboard.
 
-The goal is to build toward a live fleet monitoring dashboard: a single screen showing every vehicle's status in real time, with an alert log that surfaces critical events as they happen.
+## Demo
+
+Open `http://localhost:8080` after starting the server to see the live fleet dashboard.
+
+![Dashboard showing fleet status, battery levels, and alert log]
 
 ## What it does
 
-- Simulates multiple vehicles concurrently, each running in its own goroutine and reporting telemetry every second
-- Ingests vehicle updates into a thread-safe in-memory store protected by `sync.RWMutex`
-- Fires alerts when battery levels cross critical thresholds and accumulates them in a thread-safe log
-- Exposes the fleet state and alert history over HTTP via a JSON REST API
+- Simulates N vehicles concurrently (configurable via `--vehicles` flag), each running in its own goroutine reporting telemetry every second
+- Ingests vehicle updates into a thread-safe in-memory store and persists every event to PostgreSQL
+- Fires alerts when battery, speed, or temperature cross critical thresholds — persisted to the database and shown in the live dashboard
+- Exposes fleet state, alert history, and server metrics over HTTP
+- Serves a live web dashboard that polls the API and updates in real time
+- Exposes a Prometheus-compatible `/metrics` endpoint (event counters, latency histogram, goroutine count)
+- JSON-structured logs via Go's `slog` package
+- CI runs on every push via GitHub Actions
+
+## Running locally
+
+**Prerequisites:** Docker Desktop
+
+```bash
+# Start PostgreSQL
+docker compose up -d
+
+# Run database migrations
+goose -dir migrations postgres "host=127.0.0.1 port=5432 user=ev-user password=ev-password dbname=ev-telemetry sslmode=disable" up
+
+# Copy environment file and fill in values
+cp .env.example .env
+
+# Run the server (default: 4 vehicles on :8080)
+go run ./cmd/server/
+
+# Run with more vehicles
+go run ./cmd/server/ --vehicles=50
+
+# Custom port
+go run ./cmd/server/ --port=9090
+```
+
+Open `http://localhost:8080` in your browser.
 
 ## API
 
-The server runs on `:8080` by default. The port is configurable with the `--port` flag.
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/fleet` | All vehicles and their current state |
+| `GET` | `/vehicle/{id}` | Single vehicle by ID |
+| `GET` | `/alerts` | All alerts fired since startup |
+| `POST` | `/telemetry` | Update a vehicle's state |
+| `GET` | `/metrics` | Prometheus metrics endpoint |
+| `GET` | `/status` | Server uptime, event count, goroutine count |
 
-### `GET /fleet`
-Returns the current state of all vehicles as a JSON array.
+### Example requests
 
 ```bash
 curl http://localhost:8080/fleet
-```
-
-### `GET /vehicle/{id}`
-Returns a single vehicle by ID. Returns a `404` with a JSON error if not found.
-
-```bash
-curl http://localhost:8080/vehicle/V-001
-```
-
-### `GET /alerts`
-Returns all alerts that have fired since the server started.
-
-```bash
 curl http://localhost:8080/alerts
-```
+curl http://localhost:8080/status
 
-### `POST /telemetry`
-Accepts a JSON vehicle payload and updates that vehicle's state in the store. The vehicle must already exist (identified by `id`).
-
-```bash
 curl -X POST http://localhost:8080/telemetry \
   -H "Content-Type: application/json" \
   -d '{"id":"V-001","battery_pct":50.0,"speed_kph":30.0,"temp_c":22.0,"is_charging":false}'
 ```
 
-### Error responses
 All errors return a consistent JSON envelope:
 ```json
 {"error": "vehicle not found"}
@@ -57,48 +79,47 @@ All errors return a consistent JSON envelope:
 ev-telemetry/
 ├── cmd/
 │   └── server/
-│       └── main.go         # Entry point: wires simulation, store, alert log, and HTTP server
+│       └── main.go             # Entry point: simulation, ingest, HTTP server
 ├── internal/
-│   ├── fleet/
-│   │   └── fleet.go        # Core types: Vehicle, VehicleUpdate, Summary
-│   ├── store/
-│   │   ├── store.go        # Thread-safe in-memory fleet store (RWMutex)
-│   │   └── errors.go       # Sentinel errors
 │   ├── alert/
-│   │   └── alert.go        # Alert types and thread-safe AlertLog
+│   │   ├── alert.go            # Alert types, CheckBattery/Speed/Temp, thread-safe Log
+│   │   └── alert_test.go
+│   ├── fleet/
+│   │   └── fleet.go            # Core types: Vehicle, VehicleUpdate, Summary
+│   ├── metrics/
+│   │   └── metrics.go          # Prometheus counters, histogram, atomic event counter
+│   ├── server/
+│   │   ├── server.go           # Chi router, /status handler, static file serving
+│   │   └── handlers.go         # Route handlers
 │   ├── sim/
-│   │   └── sim.go          # Vehicle simulation goroutines
-│   └── server/
-│       ├── server.go       # HTTP server, chi router, response helpers
-│       └── handlers.go     # Route handlers
-```
-
-## Running locally
-
-```bash
-go run ./cmd/server/
-```
-
-With a custom port:
-```bash
-go run ./cmd/server/ --port 9090
+│   │   └── sim.go              # Vehicle simulation goroutines
+│   └── store/
+│       ├── store.go            # Thread-safe in-memory fleet store (RWMutex)
+│       ├── store_test.go
+│       └── errors.go
+├── migrations/
+│   ├── 00001_create_telemetry_events.sql
+│   └── 00002_create_alerts_table.sql
+├── static/
+│   ├── index.html              # Dashboard layout
+│   ├── style.css               # Dark terminal theme
+│   └── app.js                  # Polling logic, DOM updates
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # Build and test on every push
+├── docker-compose.yml
+└── .env                        # Local secrets (not committed)
 ```
 
 ## Concepts covered
 
-This project was built as a learning exercise covering:
-
-- **Goroutines and channels** — concurrent vehicle simulation with fan-in ingestion
-- **Mutexes** — `sync.RWMutex` for safe concurrent store access; `sync/atomic` for a lock-free counter
-- **HTTP servers** — `net/http` with the chi router, handler methods on a Server struct
-- **JSON** — struct tags, encoding/decoding request and response bodies
-- **Context** — `context.Context` threaded through handlers into store operations
-- **Package design** — isolated packages with clear responsibilities and well-defined interfaces
-
-## Roadmap
-
-- [ ] Richer simulation (speed variation, temperature, location)
-- [ ] Handler tests with `httptest`
-- [ ] Docker and docker-compose
-- [ ] PostgreSQL persistence
-- [ ] Live dashboard frontend
+- **Goroutines and channels** — concurrent vehicle simulation with fan-in ingestion; buffered channel sized to fleet
+- **Mutexes** — `sync.RWMutex` for safe concurrent store access; `sync/atomic` for lock-free counters
+- **PostgreSQL** — pgx connection pool, parameterised queries, Goose migrations
+- **Prometheus** — Counter, Histogram metric types; `/metrics` endpoint for scraping
+- **Structured logging** — JSON logs via `slog` with key-value fields
+- **HTTP servers** — `net/http` with chi router, handler methods, static file serving
+- **GitHub Actions CI** — build and test on every push to main
+- **Docker Compose** — containerised PostgreSQL with named volume for persistence
+- **Context** — `context.Context` threaded through handlers and store operations
+- **Package design** — isolated packages with clear responsibilities
