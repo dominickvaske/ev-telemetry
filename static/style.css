@@ -1,0 +1,241 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --border:   #30363d;
+  --text:     #c9d1d9;
+  --dim:      #8b949e;
+  --green:    #3fb950;
+  --red:      #f85149;
+  --yellow:   #d29922;
+  --cyan:     #58a6ff;
+  --orange:   #e3611c;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.logo {
+  color: var(--green);
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.header-stats {
+  display: flex;
+  gap: 24px;
+  color: var(--dim);
+}
+
+.val       { color: var(--text); font-weight: bold; }
+.val.green { color: var(--green); }
+.val.cyan  { color: var(--cyan); }
+.val.dim   { color: var(--dim); }
+
+/* ── Summary bar ─────────────────────────────── */
+.summary-bar {
+  display: flex;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 12px;
+  color: var(--dim);
+}
+
+.pill .bold { color: var(--text); font-weight: bold; }
+.pill.critical { border-color: var(--red); color: var(--red); }
+.pill.critical .bold { color: var(--red); }
+
+/* ── Main panels ─────────────────────────────── */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel:last-child { border-right: none; }
+
+.panel-header {
+  padding: 10px 16px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.live-indicator {
+  color: var(--green);
+  font-size: 11px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ── Fleet table ─────────────────────────────── */
+.table-wrapper {
+  overflow-y: auto;
+  flex: 1;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead th {
+  padding: 8px 16px;
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+tbody tr:hover { background: var(--surface); }
+
+td {
+  padding: 10px 16px;
+  vertical-align: middle;
+}
+
+.vehicle-id { font-weight: bold; color: var(--cyan); }
+
+/* ── Battery bar ─────────────────────────────── */
+.battery-cell { display: flex; align-items: center; gap: 8px; }
+
+.battery-bar {
+  display: flex;
+  gap: 2px;
+}
+
+.seg {
+  width: 7px;
+  height: 13px;
+  border-radius: 1px;
+  background: var(--border);
+}
+
+.seg.on.green  { background: var(--green); }
+.seg.on.yellow { background: var(--yellow); }
+.seg.on.red    { background: var(--red); }
+
+.battery-pct        { min-width: 38px; }
+.battery-pct.green  { color: var(--green); }
+.battery-pct.yellow { color: var(--yellow); }
+.battery-pct.red    { color: var(--red); }
+
+/* ── Status badges ───────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.badge.charging  { background: #1f3a5f; color: var(--cyan); }
+.badge.ok        { background: #1a3a20; color: var(--green); }
+.badge.warn      { background: #3a2a00; color: var(--yellow); }
+.badge.critical  { background: #3a1a1a; color: var(--red); }
+
+/* ── Alert log ───────────────────────────────── */
+#alert-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alert-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.alert-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.alert-type {
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.alert-type.BATTERY     { color: var(--red); }
+.alert-type.SPEED       { color: var(--green); }
+.alert-type.TEMPERATURE { color: var(--yellow); }
+
+.alert-time { color: var(--dim); font-size: 11px; }
+
+.alert-msg { color: var(--dim); font-size: 12px; }
+.alert-vehicle { color: var(--text); font-weight: bold; }
+
+/* ── Footer ──────────────────────────────────── */
+footer {
+  display: flex;
+  gap: 32px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--dim);
+  font-size: 11px;
+}
+
+footer code { color: var(--dim); }

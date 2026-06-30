@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,6 +76,7 @@ func Ingest(fs *store.FleetStore,
 			metrics.LatencyHist.Observe(duration)
 			// update counter metric
 			metrics.EventsCounter.Inc()
+			metrics.TotalEvents.Add(1)
 
 			// check possible alerts and log
 			checkAlerts(pool, alertLog, oldV, v)
@@ -94,48 +97,36 @@ func main() {
 	alertLog := alert.NewAlertLog()
 
 	port := flag.String("port", "8080", "HTTP server port")
+	n := flag.Int("vehicles", 4, "number of vehicles to simulate")
 	flag.Parse()
 
-	v1 := fleet.Vehicle{ID: "V-001", BatteryPct: 86.0, SpeedKPH: 0.0, TempC: 21.0, IsCharging: true, Timestamp: time.Now()}
-	v2 := fleet.Vehicle{ID: "V-002", BatteryPct: 70.0, SpeedKPH: 66.0, TempC: 24.0, IsCharging: false, Timestamp: time.Now()}
-	v3 := fleet.Vehicle{ID: "V-003", BatteryPct: 43.0, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
-
 	fs := store.NewFleetStore()
+	vehicles := make([]fleet.Vehicle, *n)
+	for i := range *n {
+		v := fleet.Vehicle{
+			ID:         fmt.Sprintf("V-%03d", i+1),
+			BatteryPct: 20 + rand.Float64()*80,
+			SpeedKPH:   rand.Float64() * 80,
+			TempC:      18 + rand.Float64()*10,
+			IsCharging: rand.Float64() < 0.2,
+			Timestamp:  time.Now(),
+		}
+		vehicles[i] = v
+		fs.Add(context.Background(), v)
+	}
 
-	fs.Add(context.Background(), v1)
-	fs.Add(context.Background(), v2)
-	fs.Add(context.Background(), v3)
-
-	//for _, vehicle := range fs.List(context.Background()) {
-	//	fmt.Println(vehicle)
-	//}
-
-	v4 := fleet.Vehicle{ID: "V-004", BatteryPct: 10.8, SpeedKPH: 32.0, TempC: 22.0, IsCharging: false, Timestamp: time.Now()}
-
-	fs.Add(context.Background(), v4)
-
-	telemetryCh := make(chan fleet.Vehicle)
+	telemetryCh := make(chan fleet.Vehicle, *n)
 	done := make(chan struct{})
 	wg := sync.WaitGroup{}
-	wg.Add(5)
+	wg.Add(*n + 1)
 
-	// launch goroutines for each vehicle and ingest
-	go func() {
-		defer wg.Done()
-		sim.SimulateVehicle(v1, telemetryCh, done)
-	}()
-	go func() {
-		defer wg.Done()
-		sim.SimulateVehicle(v2, telemetryCh, done)
-	}()
-	go func() {
-		defer wg.Done()
-		sim.SimulateVehicle(v3, telemetryCh, done)
-	}()
-	go func() {
-		defer wg.Done()
-		sim.SimulateVehicle(v4, telemetryCh, done)
-	}()
+	for _, v := range vehicles {
+		v := v
+		go func() {
+			defer wg.Done()
+			sim.SimulateVehicle(v, telemetryCh, done)
+		}()
+	}
 
 	// launch ingest goroutine to sit and wait for passed in vehicles
 	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
@@ -150,7 +141,7 @@ func main() {
 
 	// start a server in its own go routine
 	// not in wait group since it doesn't depend on the done channel
-	srv := server.NewServer(fs, alertLog)
+	srv := server.NewServer(fs, alertLog, *port)
 	go func() {
 		slog.Info("server starting", "port", *port)
 		if err := http.ListenAndServe(":"+*port, srv); err != nil {

@@ -1,6 +1,12 @@
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"sync/atomic"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
+
+var TotalEvents atomic.Int64
 
 var (
 	EventsCounter = prometheus.NewCounter(

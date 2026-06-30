@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EV Telemetry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="logo">⬡ ev-telemetry</div>
+    <div class="header-stats">
+      <span>uptime <span id="uptime" class="val">00:00:00</span></span>
+      <span>ingested <span id="events" class="val green">0</span> events</span>
+      <span>goroutines <span id="goroutines" class="val cyan">0</span></span>
+      <span id="port" class="val dim">:8080</span>
+    </div>
+  </header>
+
+  <div class="summary-bar">
+    <div class="pill">fleet <span id="fleet-count" class="bold">0</span> vehicles</div>
+    <div class="pill">avg battery <span id="avg-battery" class="bold">0%</span></div>
+    <div class="pill">charging <span id="charging-count" class="bold">0</span></div>
+    <div class="pill critical">alerts <span id="alert-count" class="bold">0</span></div>
+  </div>
+
+  <div class="panels">
+
+    <div class="panel">
+      <div class="panel-header">
+        FLEET STATUS
+        <span class="live-indicator">● LIVE</span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Battery</th>
+              <th>Speed</th>
+              <th>Temp</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="fleet-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">ALERT LOG</div>
+      <div id="alert-list"></div>
+    </div>
+
+  </div>
+
+  <footer>
+    <code>curl localhost:8080/fleet</code>
+    <code>curl localhost:8080/alerts</code>
+    <code>curl localhost:8080/metrics</code>
+    <code>^C to shutdown gracefully</code>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
